@@ -1,63 +1,68 @@
 # Excercises-4
 
-### 1. Consider the following CUDA kernel and the corresponding host function that calls it:
+### 1. Consider the following CUDA kernel and the corresponding host function that calls it
 
-    ```C++
-        __global__ void foo_kernel(int32_t * a, int32_t *b){
-            uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
-            if(threadIdx.x < 40 || threadIdx.x >= 104){
-                b[i] = a[i] + 1;
-            }
-            if(i%2 == 0){
-                a[i] = b[i] * 2;
-            }
-            for(uint32_t j = 0; j < 5 - (i%3); ++j){
-                b[i] += j;
-            }
-        }
+```C++
+__global__ void foo_kernel(int32_t * a, int32_t *b){
+    uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(threadIdx.x < 40 || threadIdx.x >= 104){
+        b[i] = a[i] + 1;
+    }
+    if(i%2 == 0){
+        a[i] = b[i] * 2;
+    }
+    for(uint32_t j = 0; j < 5 - (i%3); ++j){
+        b[i] += j;
+    }
+}
 
-        void foo(int32_t * a_d, int32_t * b_d){
-            uint32_t N = 1024;
-            foo_kernel <<< (N + 128 -1)/128, 128 >>>(a_d, b_d);
-        }
-    ```
+void foo(int32_t * a_d, int32_t * b_d){
+    uint32_t N = 1024;
+    foo_kernel <<< (N + 128 -1)/128, 128 >>>(a_d, b_d);
+}
+```
 
-    a. What is the number of warps per block?
-        128 / 32 = 4;
-    b. What is the number of warps in the grid?
-        (N + 128 - 1)/128 * 4 = 1151 / 128 * 4 = 9 * 4 = 36;
-    c. For the statement on line 04: b[i] = a[i] + 1;
+a. What is the number of warps per block?
 
-        i. How many warps in the grid are active?
-            128 分为四个warp，1：0-31，2：32-63，3：64-95；4：96-127
-            因此有效的warp包括 1，2，4；
-            所以有 3 * 9 = 27 warps active；
-        ii. How many warps in the grid are divergent?
-            四个warps中只有 1 处于完全执行，3 处于完全不执行，因此有两组 warps处于分化状态；
-            所以有 2 * 9 = 18 warps divergent
-        iii. What is the SIMD efficiency (in %) of warp 0 of block 0?
-            warp0, 32/32 * 100% = 100%；
-        iv. What is the SIMD efficiency (in %) of warp 1 of block 0?
-            warp1, (40-32) / 32 * 100% = 8/32 * 100% = 25%;
-        v. What is the SIMD efficiency (in %) of warp 3 of block 0?
-            warp3, (128-104)/32 * 100% = 24/32 * 100% = 75%;
+    128 / 32 = 4;
 
-    d. For the statement on line 07:
+b. What is the number of warps in the grid?
 
-        i. How many warps in the grid are active?
-            128 分为四个warp，1：0-31，2：32-63，3：64-95；4：96-127
-            因此有效的warp包括 1，2，3，4；
-            所以有 4 * 9 = 36 warps active；
-        ii. How many warps in the grid are divergent?
-            All of warps
-        iii. What is the SIMD efficiency (in %) of warp 0 of block 0?
-            16/32 * 100% = 50%;
+    (N + 128 - 1)/128 * 4 = 1151 / 128 * 4 = 9 * 4 = 36;
 
-    e. For the loop on line 09:
-        i. How many iterations have no divergence?
-            一次循环中有 0 1 2 3 4 五种可能，而前三次循环是每次都会进行的，则有3 iterations 没有divergence
-        ii. How many iterations have divergence?
-            from i，2 iterations have divergence
+c. For the statement on line 04: b[i] = a[i] + 1;
+
+    i. How many warps in the grid are active?
+        128 分为四个warp，1：0-31，2：32-63，3：64-95；4：96-127
+        因此有效的warp包括 1，2，4；
+        所以有 3 * 9 = 27 warps active；
+    ii. How many warps in the grid are divergent?
+        四个warps中只有 1 处于完全执行，3 处于完全不执行，因此有两组 warps处于分化状态；
+        所以有 2 * 9 = 18 warps divergent
+    iii. What is the SIMD efficiency (in %) of warp 0 of block 0?
+        warp0, 32/32 * 100% = 100%；
+    iv. What is the SIMD efficiency (in %) of warp 1 of block 0?
+        warp1, (40-32) / 32 * 100% = 8/32 * 100% = 25%;
+    v. What is the SIMD efficiency (in %) of warp 3 of block 0?
+        warp3, (128-104)/32 * 100% = 24/32 * 100% = 75%;
+
+d. For the statement on line 07:
+
+    i. How many warps in the grid are active?
+        128 分为四个warp，1：0-31，2：32-63，3：64-95；4：96-127
+        因此有效的warp包括 1，2，3，4；
+        所以有 4 * 9 = 36 warps active；
+    ii. How many warps in the grid are divergent?
+        All of warps
+    iii. What is the SIMD efficiency (in %) of warp 0 of block 0?
+        16/32 * 100% = 50%;
+
+e. For the loop on line 09:
+
+    i. How many iterations have no divergence?
+        一次循环中有 0 1 2 3 4 五种可能，而前三次循环是每次都会进行的，则有3 iterations 没有divergence
+    ii. How many iterations have divergence?
+        from i，2 iterations have divergence
 
 ### 2. For a vector addition, assume that the vector length is 2000, each thread calculates one output element, and the thread block size is 512 threads. How many threads will be in the grid?
 
@@ -103,6 +108,7 @@
     c 32*32 = 1024
     d 64*32 = 2048
     e 32*64 = 2048
+    So all the options above are possible.
 
 ### 8. Consider a GPU with the following hardware limits: 2048 threads per SM, 32 blocks per SM, and 64K (65,536) registers per SM. For each of the following kernel characteristics, specify whether the kernel can achieve full occupancy. If not, specify the limiting factor
 
