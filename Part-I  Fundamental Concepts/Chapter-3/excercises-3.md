@@ -55,6 +55,19 @@ c. Analyze the pros and cons of each of the two kernel designs.
 
 #### 2. A matrix-vector multiplication takes an input matrix B and a vector C and produces one output vector A. Each element of the output vector A is the dot product of one row of the input matrix B and C, that is, $\mathbf{A[i]=\sum ^i B[i][j]+C[j]}$ . For simplicity we will handle only square matrices whose elements are singleprecision floating-point numbers. Write a matrix-vector multiplication kernel and the host stub function that can be called with four parameters: pointer to the output matrix, pointer to the input matrix, pointer to the input vector, and the number of elements in each dimension. Use one thread to calculate an output vector element
 
+    ```C++
+    __global__ void MatMultVecKernel(float* B, float * C, float *A, int32_t width){
+        int32_t col = threadIdx.x + blockIdx.x*blockDim.x;// 遍历每一行的首元素；
+        if(col < width){
+            float AValue = 0.0F;
+            for(uint32_t i = 0; i < width; i++){
+                AValue += B[col*width + i] * C[i];
+            }
+            A[col] = AValue;
+        }
+    }
+    ```
+
 #### 3. Consider the following CUDA kernel and the corresponding host function that calls it\
 
     ```C++
