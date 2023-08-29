@@ -163,7 +163,12 @@
 
     c. The kernel described in this chapter with shared memory tiling applied using a tile size of 32 * 32 and thread coarsening applied using a coarsening factor of 4.
         ![Figure 6.13](./Figure-6.13.png)
+
+        For each block:
+        Floating-operation: Width*(1plus + 1mul)*(TILE_WIDTH*COARSE_FACTOR*Width/TILE_WIDTH)*Width/COARSE_FACTOR = 2Width^3 OP;
+        Memory-access: 
+        access: P Width*Width = Width^2;
+                Mds (Width*32*2)*((Width*Width)/(32*32)) = 64Width*(Width^2)/1024 = Width^3/16;
+                Nds (Width*32*2)*((Width*Width)/(32*32))*COARSE_FACTOR = 64Width*(Width^2)/1024*16 = Width^3;
         
-        Floating-operation: Width*(1plus + 1mul)*(Width*Width) = 2Width^3 OP;
-        Memory-access: (Width*32*2)*((Width*Width)/(32*32)) = 64Width*(Width^2)/1024 = Width^3/16;
-        OP/B =  2Width^3/(Width^3/16) = 32 OP/B
+        OP/B =  2Width^3/(Width^3/16 + Width^3 + Width^3) = 32Width/(17Width+16) OP/B
