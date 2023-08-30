@@ -100,68 +100,48 @@ __global__ void convolution_cached_tiled_2D_const_mem_kernel(float *N, float *P,
     }
 }
 
-__global__ void
-convolution_3D_basic_kernel(float *N, float *F, float *P, int32_t r, int32_t width, int32_t height, int32_t level)
+__constant__ float F_c[2 * FILTER_RADIUS + 1][2 * FILTER_RADIUS + 1][2 * FILTER_RADIUS + 1];
+__global__ void convolution_tiled_3D_const_mem_kernel(float *N, float *P, int32_t width, int32_t height, int32_t length)
 {
-    // Output index also input center index
-    int32_t outCol = blockIdx.x * blockDim.x + threadIdx.x;
-    int32_t outRow = blockIdx.y * blockDim.y + threadIdx.y;
-    int32_t outLevel = blockIdx.z * blockDim.z + threadIdx.z;
-    // Store calculate value
-    float Pvalue = 0.0F;
+    // Setting indices
+    int32_t col = blockIdx.x * OUT_TILE_DIM + threadIdx.x - FILTER_RADIUS;
+    int32_t row = blockIdx.y * OUT_TILE_DIM + threadIdx.y - FILTER_RADIUS;
+    int32_t level = blockIdx.z * OUT_TILE_DIM + threadIdx.z - FILTER_RADIUS;
 
-    // For each row;
-    for (uint32_t fRow = 0; fRow < 2 * r + 1; fRow++)
+    // loading input file
+    __shared__ float N_s[IN_TILE_DIM][IN_TILE_DIM][IN_TILE_DIM];
+    if ((row >= 0 && row < height) && (col >= 0 && col < width) && (level >= 0 && level < length))
+    { // Store 8*8 data
+        N_s[threadIdx.z][threadIdx.y][threadIdx.x] = N[(level * height + row) * width + col];
+    }
+    else
+    { // Setting Ghost cell
+        N_s[threadIdx.z][threadIdx.y][threadIdx.x] = 0.0F;
+    }
+    __syncthreads();
+
+    // Calculating output elements
+    int32_t tileCol = threadIdx.x - FILTER_RADIUS;
+    int32_t tileRow = threadIdx.y - FILTER_RADIUS;
+    int32_t tileLevel = threadIdx.z - FILTER_RADIUS;
+
+    // turning off the threads at the edges of the block
+    if ((row >= 0 && row < height) && (col >= 0 && col < width) && (level >= 0 && level < length))
     {
-        // For each col value;
-        for (uint32_t fCol = 0; fCol < 2 * r + 1; fCol++)
+        if (tileCol >= 0 && tileCol < OUT_TILE_DIM && tileRow >= 0 && tileRow < OUT_TILE_DIM && tileLevel >= 0 && tileLevel < OUT_TILE_DIM)
         {
-            // For each level value;
-            for (uint32_t fLevel = 0; fLevel < 2 * r + 1; fLevel++)
+            float Pvalue = 0.0F;
+            for (int32_t fRow = 0; fRow < 2 * FILTER_RADUIS + 1; fRow++)
             {
-                // Current input data array index(inRow, inCol, inLevel)
-                inRow = outRow - r + fRow;
-                inCol = outCol - r + fCol;
-                inLevel = outLevel - r + fLevel;
-                // Setting bandary conditions include col and row;
-                if ((inRow >= 0 && inRow < height) && (inCol >= 0 && inCol < width) && (inLevel >= 0 && inLevel < level))
+                for (int32_t fCol = 0; fCol < 2 * FILTER_RADUIS + 1; fCol++)
                 {
-                    // Pvalue = Fwith output index * N width current index;
-                    Pvalue += F[fRow][fCol][fLevel] * N[(level * height + inRow) * width + inCol];
+                    for (int32_t fLevel = 0; fLevel < 2 * FILTER_RADUIS + 1; fLevel++)
+                    {
+                        Pvalue += F[fRow][fCol][fLevel] * N_s[tileRow + fRow][tileCol + fCol][tileCol + fLevel];
+                    }
                 }
             }
+            P[(level * height + row) * width + col] = Pvalue;
         }
     }
-    // Output Pvalue
-    P[outRow][outCol][outLevel] = Pvalue;
-}
-
-__global__ void
-convolution_2D_basic_kernel(float *N, float *F, float *P, int32_t r, int32_t width, int32_t height)
-{
-    // Output index also input center index
-    int32_t outCol = blockIdx.x * blockDim.x + threadIdx.x;
-    int32_t outRow = blockIdx.y * blockDim.y + threadIdx.y;
-    // Store calculate value
-    float Pvalue = 0.0F;
-
-    // For each row;
-    for (uint32_t fRow = 0; fRow < 2 * r + 1; fRow++)
-    {
-        // For each col value;
-        for (uint32_t fCol = 0; fCol < 2 * r + 1; fCol++)
-        {
-            // Current input data array index(inRow, inCol)
-            inRow = outRow - r + fRow;
-            inCol = outCol - r + fCol;
-            // Setting bandary conditions include col and row;
-            if (inRow >= 0 && inRow < height && inCol >= 0 && inCol < width)
-            {
-                // Pvalue = Fwith output index * N width current index;
-                Pvalue += F[fRow][fCol] * N[inRow * width + inCol];
-            }
-        }
-    }
-    // Output Pvalue
-    P[outRow][outCol] = Pvalue;
 }
